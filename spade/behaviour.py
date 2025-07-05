@@ -343,10 +343,10 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
             new_event_loop._ready.extend(ready)
             asyncio.set_event_loop(new_event_loop)
 
-            print(f"[{self.name}] Event loop reorganizado por prioridad.")
-            print(f"[{self.name}] Loop._ready después de reordenar:")
-            for i, h in enumerate(new_event_loop._ready):
-                print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}")
+            #print(f"[{self.name}] Event loop reorganizado por prioridad.")
+            #print(f"[{self.name}] Loop._ready después de reordenar:")
+            #for i, h in enumerate(new_event_loop._ready):
+            #    print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}")
 
         except Exception as e:
             print(f"[{self.name}] Error al reorganizar el event loop: {e}")
