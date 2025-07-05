@@ -10,7 +10,7 @@ import aioxmpp
 import aioxmpp.ibr as ibr
 from aioxmpp.dispatcher import SimpleMessageDispatcher
 
-from .behaviour import BehaviourType, FSMBehaviour, CyclicBehaviour
+from .behaviour import BehaviourType, FSMBehaviour, CyclicBehaviour, OneShotBehaviour
 from .container import Container
 from .message import Message
 from .presence import PresenceManager
@@ -55,7 +55,7 @@ class Agent(object):
 
         self.container = Container()
         self.container.register(self)
-
+        self.max_priority = 9999
         self.loop = self.container.loop
         asyncio.set_event_loop(self.loop)
 
@@ -354,7 +354,44 @@ class Agent(object):
             return self._values[name]
         else:
             return None
+    
 
+    #Metodo añadido para obtener los comportamientos del agente
+    def get_behaviours(self) -> List[BehaviourType]:
+        """
+        Returns a list of all behaviours registered in the agent.
+
+        Returns:
+            list: a list of all behaviours registered in the agent.
+        """
+        return self.behaviours
+    """
+    def get_running_behaviours(self) -> List[BehaviourType]:
+        """
+        #Returns a list of all behaviours registered in the agent that are running.
+
+        #Returns:
+        #    list: a list of all behaviours registered in the agent that are running.
+    """
+        running_behaviours = []
+        for behaviour in self.behaviours:
+            if behaviour.is_running:
+                running_behaviours.append(behaviour)
+        return running_behaviours
+        
+    def get_executable_behaviours(self) -> List[BehaviourType]:
+        """
+        #Returns a list of all behaviours registered in the agent that are executable in that moment.
+
+        #Returns:
+        #    list: a list of all behaviours registered in the agent that are executable in that moment.
+    """
+        executable_behaviours = []
+        for behaviour in self.behaviours:
+            if isinstance(behaviour, OneShotBehaviour) and not behaviour._already_executed:
+                executable_behaviours.append(behaviour)
+        return executable_behaviours
+    """
     def _message_received(self, msg: aioxmpp.Message) -> List[Task]:
         """
         Callback run when an XMPP Message is reveived.

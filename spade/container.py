@@ -90,6 +90,15 @@ class Container(object):
             KeyError: if the agent is not found
         """
         return self.__agents[jid]
+    #Cambio para que devuelva los agentes como una lista
+    def get_agents(self):
+        """
+        Returns a list of all registered agents.
+        
+        Returns:
+            list: a list of all registered agents.
+        """
+        return list(self.__agents.values())
 
     async def send(self, msg: Message, behaviour: BehaviourType) -> None:
         """
