@@ -18,7 +18,7 @@ class PrioritizedHandle(asyncio.Handle):
         self.priority = priority
         self.execounter = 0
         self.ag_name = ag_name
-        self._when = None  
+        self._when = None
 
     # Método de comparación
     def __lt__(self, other):

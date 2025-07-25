@@ -100,7 +100,6 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
             del handle._source_traceback[-1]
         heapq.heappush(self._ready, handle)
         return handle
-    
 
     def _add_callback(self, handle):
         if not handle._cancelled:
@@ -184,13 +183,15 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
                 self._log_event('START', handle, current_time)
                 self._log_event('READY-B', handle, current_time)
 
-
+#Cambios -> current_handle
         ntodo = len(self._ready)
+        self._current_handle = None
         for i in range(ntodo):
             handle = heapq.heappop(self._ready)
 
             if handle._cancelled:
                 continue
+            self._current_handle = handle
             if self._debug:
                 try:
                     self._current_handle = handle
@@ -363,8 +364,27 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
                 ag_name = None
         
         return PrioritizedFuture(loop=self, priority = priority, ag_name=ag_name)
-    
-    
+    #Prueba de cambiar la prioridad de un handle
+    def change_priority(self, handle, new_priority):
+        """Change the priority of a handle."""
+        if not isinstance(handle, PrioritizedHandle):
+            raise TypeError("handle must be an instance of PrioritizedHandle")
+        
+        if handle._cancelled:
+            return
+        
+        if handle in self._ready:
+            self._ready.remove(handle)
+            handle.priority = new_priority
+            heapq.heappush(self._ready, handle)
+        elif handle in self._scheduled:
+            self._scheduled.remove(handle)
+            handle.priority = new_priority
+            heapq.heappush(self._scheduled, handle)
+
+        if isTrace:
+            current_time = time.perf_counter() - self.start_time
+            self._log_event('PRIORITY_CHANGE', handle, current_time)
 def _run_until_complete_cb(fut):
     if not fut.cancelled():
         exc = fut.exception()
