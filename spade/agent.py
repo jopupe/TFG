@@ -126,7 +126,7 @@ class Agent(object):
         # Presence service
         self.presence = PresenceManager(self)
 
-        await self.loop.create_task(self._async_connect(), self.priority, ag_name = f"{self.ag_name}_") #ag_name = f"{self.ag_name}_connect_"
+        await self.loop.create_task(self._async_connect(), self.priority, ag_name = f"{self.jid.localpart}_") #ag_name = f"{self.ag_name}_connect_"
         #await self._async_connect()
 
         # register a message callback here
@@ -185,6 +185,80 @@ class Agent(object):
         This coroutine may be overloaded.
         """
         await asyncio.sleep(0)
+    # Metodo para que el usuario pueda sobreescribir el cambio de prioridad de un comportamiento del agente
+    async def change_priority(self)-> None:
+        """
+        Change the priority of the agent.
+        This method may be overloaded by the user to change the priority of a behaviour.
+        """
+        ag_behaviours = self.get_behaviours()
+        behaviours_priorities = {behaviour.name: behaviour.priority for behaviour in ag_behaviours}
+        print("Comportamientos y prioridades actuales:", behaviours_priorities)
+        for behaviour in ag_behaviours:
+            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
+            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
+            if opcion == 's':
+                try:
+                    nueva = int(input("Introduce la nueva prioridad: "))
+                    behaviour.priority = nueva
+                    #behaviours_priorities[behaviour.name] = nueva
+                    loop = asyncio.get_event_loop()
+                    handle_of_behaviour = behaviour.get_handle()
+                    if behaviour.is_handle_of_behaviour(handle_of_behaviour, behaviour):
+                        #loop.change_priority(handle_of_behaviour, nueva)
+                        task = behaviour.get_task()
+                        task.change_task_priority(nueva, handle_of_behaviour)
+                        #behaviour.change_task_priority(nueva)
+                        #behaviour.reinsert_in_current_iteration(behaviour)
+                        #print("Esperando a que la prioridad de {} sea mayor que {}".format(behaviour.name, max_priority))
+                    #ag.priority = nueva
+                    #behaviour.kill()
+                    #ag.remove_behaviour(behaviour)
+                    print("Prioridad de {} cambiada a {}".format(behaviour.name, behaviour.priority))
+                    
+                except ValueError:
+                    print("Valor inválido. Prioridad no cambiada.")
+        
+        #self.agent.max_priority = min(b.priority for b in self.agent.get_behaviours())
+    def change_behaviour_priority_forever(self, behaviour: BehaviourType, new_priority: int) -> None:
+        """
+        Change the priority of a behaviour permanently.
+
+        Args:
+            behaviour (Type[CyclicBehaviour]): the behaviour to change priority
+            new_priority (int): the new priority to set
+
+        """
+        
+        loop = asyncio.get_event_loop()
+        handle_of_behaviour = behaviour.get_handle()
+        if isinstance(behaviour, OneShotBehaviour):
+            if behaviour._already_executed:
+                print("Cannot change priority of an already executed OneShotBehaviour")
+                return
+        if behaviour.is_handle_of_behaviour(handle_of_behaviour, behaviour):
+            #loop.change_priority(handle_of_behaviour, new_priority)
+            task = behaviour.get_task()
+
+            task.change_task_priority(new_priority, handle_of_behaviour)
+
+    def change_behaviour_priority_once(self, behaviour: BehaviourType, new_priority: int) -> None:
+        """
+        Change the priority for one iteration.
+
+        Args:
+            behaviour (Type[CyclicBehaviour]): the behaviour to change priority
+            new_priority (int): the new priority to set
+
+        """
+        loop = asyncio.get_event_loop()
+        handle_of_behaviour = behaviour.get_handle()
+        if isinstance(behaviour, OneShotBehaviour):
+            if behaviour._already_executed:
+                print("Cannot change priority of an already executed OneShotBehaviour")
+                return
+        if behaviour.is_handle_of_behaviour(handle_of_behaviour, behaviour):
+            loop.change_priority(handle_of_behaviour, new_priority)
 
     @property
     def name(self) -> str:
@@ -236,10 +310,10 @@ class Agent(object):
 
         """
 
-        
+        #Cambiado
         # Crear la tarea utilizando el contexto
-        return self.loop.create_task(coro, priority=priority, ag_name= f"{self.ag_name}_{name}")
-        
+        return self.loop.create_task(coro, priority=priority, ag_name= f"{self.jid.localpart}_{name}")
+        #return self.loop.create_task(coro, priority=priority, ag_name=f"{self.ag_name}_{name}")
     def add_behaviour(
         self, behaviour: BehaviourType, template: Optional[Template] = None
     ) -> None:

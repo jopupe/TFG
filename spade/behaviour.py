@@ -8,6 +8,7 @@ import PriorityAsyncio
 import heapq
 from PriorityAsyncio.events import PrioritizedHandle
 from PriorityAsyncio.base_events import PrioritizedEventLoop
+from PriorityAsyncio.tasks import PrioritizedTask
 
 from abc import ABCMeta, abstractmethod
 from asyncio import CancelledError
@@ -295,15 +296,17 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         while not self._done() and not self.is_killed():
             try:
                 loop = asyncio.get_running_loop()
-                #for i, h in enumerate(loop._ready):
-                    #print("loop._ready antes de hacer el _run:")
-                    #print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}")
+                print("event loop:", loop)
+                print("[{}] Event loop before running behaviour: {}".format(self.name, list(loop._ready)))
+                for i, h in enumerate(loop._ready):
+                    print("loop._ready antes de hacer el _run:")
+                    print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}, ag_name={getattr(h, 'ag_name', 'sin ag_name')}")
                 if self.priority > self.agent.max_priority:
                     print("Behaviour {} ha intentado ejecutarse con prioridad {} pero la prioridad máxima del agente es {}".format(self, self.priority, self.agent.max_priority))
-                await self.wait_until_high_priority()
                 await self._run()
-                await self.change_multiple_priorities()
-                
+                #await self.change_multiple_priorities()
+                await self.agent.change_priority()
+                print("terminado el _run de {}".format(self.name))
                 await asyncio.sleep(0)  # relinquish cpu
             except CancelledError:  # pragma: no cover
                 logger.debug("Behaviour {} cancelled".format(self))
@@ -325,33 +328,52 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         self.is_running = False
         self.agent.remove_behaviour(self)
     
-    
-
-    def reorganize_event_loop(self):
+    def is_handle_of_behaviour(self, handle, behaviour):
+        #El handle utiliza el ag_name(el parametro opcional) del agente y no el jid
+        print("entrado en handle of behaviour: handle={}, behaviour={}".format(handle.ag_name, behaviour.agent.name))
+        handle_name = getattr(handle, "ag_name", None)
+        behaviour_name = behaviour.name
+        agent_name = behaviour.agent.name
+        
+        return handle_name == f"{agent_name}_{behaviour_name}"
+    """
+    def reinsert_in_current_iteration(self, behaviour):
         loop = asyncio.get_running_loop()
+        # Cancelar el handle actual si es este comportamiento
+        for i, h in enumerate(loop._ready):
+            print(f"[DEBUG] Handle {i}: {h}, priority={getattr(h, 'priority', '?')}, _behaviour_id={getattr(h, '_behaviour_id', 'None')}")
+        current_handle = getattr(loop, "_current_handle", None)
+        if current_handle and getattr(current_handle, "_callback", None) == behaviour._step:
+            current_handle.cancel()
+        new_ready = []
+        found_prioritized_task = False
 
-        try:
-            #print("Loop antes de cambiar prioridad: {}".format(list(loop._ready)))
-            # Filtra solo PrioritizedHandle
-            ready = [h for h in loop._ready if isinstance(h, PrioritizedHandle)]
-            #print("Ready: {}".format(ready))
-            # Rehace el heap para reordenar por prioridad
-            heapq.heapify(ready)
-            #print(heapq.nsmallest(10, ready, key=lambda h: h.priority), "prioridades:", [h.priority for h in heapq.nsmallest(10, ready, key=lambda h: h.priority)])
-            # Reemplaza el _ready del loop (¡hazlo con cuidado!)
-            new_event_loop = PrioritizedEventLoop()
-            new_event_loop._ready.extend(ready)
-            asyncio.set_event_loop(new_event_loop)
+        while loop._ready:
+            handle = heapq.heappop(loop._ready)
+            if behaviour.is_handle_of_behaviour(handle, behaviour):
+                print(f"[DEBUG] Eliminado handle de {behaviour.name}: {handle}")
+            if isinstance(handle, PrioritizedHandle) and isinstance(getattr(handle._callback, "__self__", None), PrioritizedTask):
+                found_prioritized_task = True
+            else:
+                new_ready.append(handle)
 
-            #print(f"[{self.name}] Event loop reorganizado por prioridad.")
-            #print(f"[{self.name}] Loop._ready después de reordenar:")
-            #for i, h in enumerate(new_event_loop._ready):
-            #    print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}")
+        loop._ready = new_ready
+        heapq.heapify(loop._ready)
 
-        except Exception as e:
-            print(f"[{self.name}] Error al reorganizar el event loop: {e}")
-    
-    
+        # Volver a insertar con la prioridad nueva
+        if found_prioritized_task:
+            # Recrea como PrioritizedTask
+            print(f"[DEBUG] Reinsertando como PrioritizedTask a {behaviour.name}")
+            task = PrioritizedTask(behaviour._step(), loop=loop, priority=behaviour.priority)
+            task.ag_name = behaviour.agent.ag_name
+            handle = PrioritizedHandle(task._PrioritizedTask__step, (), loop, task.priority, task.ag_name)
+            heapq.heappush(loop._ready, handle)
+        else:
+            # Inserta como callback directo
+            print(f"[DEBUG] Reinsertando como callback simple a {behaviour.name}")
+            handle = PrioritizedHandle(behaviour._step, (), loop, behaviour.priority, behaviour.agent.ag_name)
+            heapq.heappush(loop._ready, handle)
+    """
     async def wait_until_high_priority(self) -> None:
         """
         Coroutine to wait until the behaviour's priority is higher than a given value.
@@ -363,6 +385,39 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         while self.priority > self.agent.max_priority:
             await asyncio.sleep(0.1)
             
+    def get_handle(self) -> PrioritizedHandle:
+        """
+        Returns the handle of the behaviour in the event loop.
+        This is useful to change the priority of the behaviour.
+
+        Returns:
+            PrioritizedHandle: the handle of the behaviour in the event loop
+        """
+        loop = asyncio.get_event_loop()
+        for handle in loop._ready:
+            if self.is_handle_of_behaviour(handle, self):
+                return handle
+        raise ValueError("Behaviour not found in event loop")
+    def get_task(self) -> PrioritizedTask:
+        """
+        Returns the task of the behaviour in the event loop.
+        This is useful to change the priority of the behaviour.
+
+        Returns:
+            PrioritizedTask: the task of the behaviour in the event loop
+        """
+        handle = self.get_handle()
+
+        if isinstance(handle, PrioritizedHandle):
+            callback = handle._callback
+            # Si el callback es un método de una PrioritizedTask
+            if hasattr(callback, "__self__") and isinstance(callback.__self__, PrioritizedTask):
+                return callback.__self__
+            else:
+                raise ValueError("El handle no contiene una PrioritizedTask.")
+        
+        raise ValueError("Behaviour no encontrado en el event loop.")
+    
     async def change_multiple_priorities(self):
         """
         Allows the user to change the priority of multiple behaviours.
@@ -401,13 +456,20 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
                     nueva = int(input("Introduce la nueva prioridad: "))
                     behaviour.priority = nueva
                     behaviours_priorities[behaviour.name] = nueva
-                    updated_loop = behaviour.reorganize_event_loop()
-                    self.agent.set_loop(updated_loop)
-                    #print("Esperando a que la prioridad de {} sea mayor que {}".format(behaviour.name, max_priority))
+                    loop = asyncio.get_event_loop()
+                    handle_of_behaviour = behaviour.get_handle()
+                    if behaviour.is_handle_of_behaviour(handle_of_behaviour, behaviour):
+                        loop.change_priority(handle_of_behaviour, nueva)
+                        #task = behaviour.get_task()
+                        #task.change_task_priority(nueva)
+                        #behaviour.change_task_priority(nueva)
+                        #behaviour.reinsert_in_current_iteration(behaviour)
+                        #print("Esperando a que la prioridad de {} sea mayor que {}".format(behaviour.name, max_priority))
                     #ag.priority = nueva
                     #behaviour.kill()
                     #ag.remove_behaviour(behaviour)
                     print("Prioridad de {} cambiada a {}".format(behaviour.name, behaviour.priority))
+                    
                 except ValueError:
                     print("Valor inválido. Prioridad no cambiada.")
         
@@ -442,7 +504,7 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         Allows the user to change the priority of the behaviour.
         This method is intended to be called from the agent's console.
         """
-        """
+        
         loop = asyncio.get_event_loop()
         behaviours = self.agent.get_behaviours()
         for behaviour in behaviours:
@@ -452,17 +514,10 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
                 try:
                     nueva = int(input("Introduce la nueva prioridad: "))
                     behaviour.priority = nueva
-                    #nuevo = behaviour.__class__( priority=100)
-                    #asyncio.wait(fs)
                     behaviour.kill()  # Stop the behaviour to apply the new priority
                     self.agent.add_behaviour(behaviour)  # Re-add the behaviour with the new priority
                     #self.agent.remove_behaviour(behaviour)
                     #self.agent.add_behaviour(behaviour)  # Re-add the behaviour with the new priority
-                #    handle = next(
-                #    (h for h in loop._ready
-                #    if hasattr(h, 'callback') and getattr(h.callback, '__self__', None) == behaviour),
-                #    None
-                #)
                     #loop.update_handle_priority(loop, handle, nueva)
                     #self.agent.set_loop(loop)
                     
@@ -471,38 +526,48 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
                 except ValueError:
                     
                     print("Valor inválido. Prioridad no cambiada.")
-        """
+        
     def change_priority(self):
-        """
-        print("Prioridad actual de {}: {}".format(self.agent.ag_name, self.priority))
-        opcion = input("¿Quieres cambiar la prioridad? (s/n): ").lower()
-        if opcion == 's':
-            try:
-                nueva = int(input("Introduce la nueva prioridad: "))
-                self.priority = nueva
-                self.agent.priority = nueva
-                print("Prioridad cambiada a {}".format(self.priority))
-                self.kill()  # Stop the behaviour to apply the new priority
+        
+        behaviours = self.agent.get_behaviours()
+        ag = self.agent
+        for behaviour in behaviours:
+            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
+            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
+            if opcion == 's':
+                try:
+                    nueva = int(input("Introduce la nueva prioridad: "))
+                    self.priority = nueva
+                    print("Prioridad cambiada a {}".format(self.priority))
+                    self.kill()  # Stop the behaviour to apply the new priority
 
-                if isinstance(self, PeriodicBehaviour):
-                    nuevo = self.__class__(period=self.period.total_seconds(), priority=self.priority)
-                    self.agent.add_behaviour(nuevo)
+                    if isinstance(behaviour, PeriodicBehaviour):
+                        nuevo = behaviour.__class__(period=behaviour.period.total_seconds(), priority=behaviour.priority)
+                        ag.add_behaviour(nuevo)
 
-                elif isinstance(self, FSMBehaviour):
-                    nuevo = self.__class__(priority=self.priority)
-                    # Se recomienda copiar los estados si es necesario
-                    self.agent.add_behaviour(nuevo)
+                    elif isinstance(behaviour, TimeoutBehaviour):
+                        nuevo = behaviour.__class__(start_at=behaviour._timeout, priority=behaviour.priority)
+                        ag.add_behaviour(nuevo)
 
-                elif isinstance(self, CyclicBehaviour):
-                    nuevo = self.__class__(priority=self.priority)
-                    self.agent.add_behaviour(nuevo)
-            except ValueError:
-                print("Valor inválido. Prioridad no cambiada.")
-        elif opcion == 'n':
-            print("Prioridad no cambiada")
-        else:
-            print("Entrada no válida. Prioridad no cambiada.")
-        """
+                    elif isinstance(behaviour, FSMBehaviour):
+                        nuevo = behaviour.__class__(priority=behaviour.priority)
+                        ag.add_behaviour(nuevo)
+                    
+                    elif isinstance(behaviour, OneShotBehaviour):
+                        if not behaviour._already_executed:
+                            nuevo = behaviour.__class__(priority=behaviour.priority)
+                            ag.add_behaviour(nuevo)
+                    
+                    elif isinstance(behaviour, CyclicBehaviour):
+                        nuevo = behaviour.__class__(priority=behaviour.priority)
+                        ag.add_behaviour(nuevo)
+                except ValueError:
+                    print("Valor inválido. Prioridad no cambiada.")
+            elif opcion == 'n':
+                print("Prioridad no cambiada")
+            else:
+                print("Entrada no válida. Prioridad no cambiada.")
+        
     async def enqueue(self, message: Message) -> None:
         """
         Enqueues a message in the behaviour's mailbox
