@@ -1,0 +1,111 @@
+DECIMAL_DIGITS 0
+DURATION 50
+LINE_NAME 0 A
+LINE_NAME 1 B
+LINE_NAME 2 C
+PALETTE Rainbow
+ZOOM_X    4
+ZOOM_Y	 16
+COLOR EXEC-E 0 orchid4
+
+0    READY-B 0
+0    READY-B 1
+0    READY-B 2    
+0    START 0    
+0    START 1    
+0    START 2    
+0    EXEC-B 0    
+
+    
+2    READY-E 0   
+2    STOP 0 
+2    EXEC-E 0    
+2    EXEC-B 1    
+   
+5    READY-E 1    
+5    STOP 1    
+5    EXEC-E 1    
+5    EXEC-B 2 
+   
+7    ARROWUP 2 e2 orange  
+  
+8    ARROWDOWN 1 e1    
+
+9    LOCK 2 s0 
+9    EXEC-E 2
+9    EXEC-B 2
+   
+10   DEADLINE 1
+    
+11   DEADLINE 0    
+11   READY-B 0 
+11   START 0 
+11   EXEC-E 2 gray70    
+11   EXEC-B 0    
+   
+13   READY-E 0    
+13   STOP 0 
+13   EXEC-E 0    
+13   READY-B 1    
+13   START 1    
+13   EXEC-B 1    
+   
+14   VLINE M1 
+   
+15   BLOCK 1 s0    
+15   READY-E 1
+15   EXEC-E 1    
+15   EXEC-B 2    
+
+17   TEXTOVER  3 "KIWI TRACE" blue3
+17   TEXTUNDER 3 "EXAMPLE" blue3
+  
+20   UNLOCK 2 s0  
+20   LOCK 1 s0    
+20   READY-B 1
+20   EXEC-E 2 gray70    
+20   EXEC-B 1    
+   
+21   UNLOCK 1 s0  
+21   READY-E 1    
+21   STOP 1 
+21   EXEC-E 1 gray70    
+21   EXEC-B 2    
+   
+22   DEADLINE 0    
+22   READY-B 0   
+22   START 0   
+22   EXEC-E 2    
+22   EXEC-B 0    
+ 
+23   DEADLINE 1
+    
+24   READY-E 0  
+24   STOP 0  
+24   EXEC-E 0    
+24   EXEC-B 2    
+  
+26   READY-B 1    
+26   START 1 
+26   EXEC-E 2    
+26   EXEC-B 1    
+   
+27   ARROWUP 2 "" orange    
+  
+29   READY-E 1    
+29   STOP 1   
+29   EXEC-E 1    
+29   EXEC-B 2    
+ 
+32   READY-E 2    
+32   STOP 2    
+32   EXEC-E 2    
+
+33   DEADLINE 0    
+33   EXEC-B 0    
+33   READY-B 0    
+33   START 0    
+
+35   READY-E 0    
+35   STOP 0    
+35   EXEC-E 0    
