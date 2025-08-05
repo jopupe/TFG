@@ -549,7 +549,6 @@ proc interfazCrea {} {
     grid rowconfigure . 1 -weight 1 
     grid rowconfigure . 2 -weight 0
     grid columnconfigure . 0 -weight 1
-    
 
     ## creamos los marcos principales
 
@@ -1091,7 +1090,7 @@ proc visorCrea {f} {
     
 
     canvas $n -scrollregion "0 0 80 4000" \
-	    -width 80 -height 1600 \
+	    -width 180 -height 1600 \
 	    -borderwidth 0 -highlightthickness 0 \
 	    -yscrollincrement 1 \
 	    -background white -relief groove -borderwidth 2
@@ -3131,9 +3130,9 @@ proc dibujarDibujaLineas {} {
 	
 	if { $i != $numeroDeLineasTemporales } {
 	    $n create text \
-		    78 \
+		    100 \
 		    $Y \
-		    -anchor se -text [lindex $nombresDeLasLineas $i] \
+		    -anchor center -text [lindex $nombresDeLasLineas $i] \
 		    -font standard  -tags "cuadricula"
 	}
     }
