@@ -45,6 +45,7 @@ class PrioritizedTask(futures._PyFuture):  # Inherit Python Task implementation
     def __init__(self, coro, priority, *, loop=None, name=None, ag_name = None, context=None,
                  eager_start=False):
         super().__init__(loop=loop)
+        self.execounter = 0
         if self._source_traceback:
             del self._source_traceback[-1]
         if not coroutines.iscoroutine(coro):
@@ -117,8 +118,7 @@ class PrioritizedTask(futures._PyFuture):  # Inherit Python Task implementation
                 f'Cannot change priority of a done task: {self!r}')
         self.priority = priority
         self._loop.change_priority(handle, priority)
-        #self._loop.call_soon(self.__step, priority=priority, context=self._context)
-        self.__del__()  # Remove the task from the scheduled tasks
+        #self.__del__()  # Remove the task from the scheduled tasks
 
     def set_result(self, result):
         raise RuntimeError('Task does not support set_result operation')
@@ -263,6 +263,8 @@ class PrioritizedTask(futures._PyFuture):  # Inherit Python Task implementation
         asyncio._enter_task(self._loop, self)
         try:
             self.__step_run_and_handle_result(exc)
+            self.execounter += 1
+                
         finally:
             asyncio._leave_task(self._loop, self)
             self = None  

@@ -183,9 +183,7 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
                 self._log_event('START', handle, current_time)
                 self._log_event('READY-B', handle, current_time)
 
-#Cambios -> current_handle
         ntodo = len(self._ready)
-        self._current_handle = None
         for i in range(ntodo):
             handle = heapq.heappop(self._ready)
 
@@ -194,10 +192,10 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
             self._current_handle = handle
             if self._debug:
                 try:
-                    self._current_handle = handle
                     t0 = self.time()
                     handle._run()
                     handle.execounter += 1
+                    
                     dt = self.time() - t0
 
                 finally:
@@ -217,7 +215,7 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
                         self._log_event('EXEC-E', handle, current_time)
 
                     handle.execounter += 1
-
+                    
                 except Exception as e: 
                     print("EXCEPCION CAPTURADA: ", e)
 
@@ -377,6 +375,8 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
             self._ready.remove(handle)
             handle.priority = new_priority
             heapq.heappush(self._ready, handle)
+        elif handle is self._current_handle:
+            self._current_handle.priority = new_priority
         elif handle in self._scheduled:
             self._scheduled.remove(handle)
             handle.priority = new_priority
@@ -385,6 +385,7 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
         if isTrace:
             current_time = time.perf_counter() - self.start_time
             self._log_event('PRIORITY_CHANGE', handle, current_time)
+
 def _run_until_complete_cb(fut):
     if not fut.cancelled():
         exc = fut.exception()

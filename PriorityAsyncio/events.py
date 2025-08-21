@@ -3,6 +3,7 @@ import heapq
 import os
 import threading
 from asyncio import format_helpers
+from .tasks import PrioritizedTask
 
 class _RunningLoop(threading.local):
     loop_pid = (None, None)
@@ -20,11 +21,32 @@ class PrioritizedHandle(asyncio.Handle):
         self.ag_name = ag_name
         self._when = None
 
+    def get_task(self) -> PrioritizedTask:
+        """
+        Returns the task of the handle in the event loop.
+        This is useful to get the task associated with the handle.
+
+        Returns:
+            PrioritizedTask: the task of the handle in the event loop
+        """
+        if isinstance(self, PrioritizedHandle):
+            callback = self._callback
+            # Si el callback es un método de una PrioritizedTask
+            if hasattr(callback, "__self__") and isinstance(callback.__self__, PrioritizedTask):
+                return callback.__self__
+
     # Método de comparación
     def __lt__(self, other):
-        if self.priority == other.priority:
-            return self.execounter < other.execounter
+        task = self.get_task()
+        other_task = other.get_task()
+        if task is not None and other_task is not None:
+            if self.priority == other.priority:
+                return task.execounter < other_task.execounter
+            else:
+                return self.priority < other.priority
         else:
+            if self.priority == other.priority:
+                return self.execounter < other.execounter
             return self.priority < other.priority
 
 
@@ -40,10 +62,30 @@ class PrioritizedTimerHandle(asyncio.TimerHandle):
         self.ag_name = ag_name
         self.execounter = 0
 
+    def get_task(self) -> PrioritizedTask:
+        """
+        Returns the task of the handle in the event loop.
+        This is useful to get the task associated with the handle.
 
+        Returns:
+            PrioritizedTask: the task of the handle in the event loop
+        """
+        if isinstance(self, PrioritizedHandle):
+            callback = self._callback
+            # Si el callback es un método de una PrioritizedTask
+            if hasattr(callback, "__self__") and isinstance(callback.__self__, PrioritizedTask):
+                return callback.__self__
     # Método de comparación
     def __lt__(self, other):
         if self.priority == other.priority:
+            task = self.get_task()
+            other_task = other.get_task()
+            if task is not None and other_task is not None:
+                if self._when is not None and other._when is not None and self._when != other._when:
+                    return self._when < other._when
+                return task.execounter < other_task.execounter
+
+            # Si no hay tareas asociadas
             if self._when is not None and other._when is not None and self._when != other._when:
                 return self._when < other._when
             return self.execounter < other.execounter
