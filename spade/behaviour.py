@@ -60,8 +60,6 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         self.priority = priority  
         self.queue = None
         self.name = name if name else str(self.__class__.__name__)
-        # Añadido para saber cuantas veces se ha ejecutado el comportamiento
-        #self.execounter = 0
 
     def set_agent(self, agent) -> None:
         """
@@ -297,38 +295,11 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         cancelled = False
         while not self._done() and not self.is_killed():
             try:
-                """
-                loop = asyncio.get_running_loop()
-                print("event loop:", loop)
-                print("[{}] Event loop before running behaviour: {}".format(self.name, list(loop._ready)))
-                for i, h in enumerate(loop._ready):
-                    print("loop._ready antes de hacer el _run:")
-                    print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}, ag_name={getattr(h, 'ag_name', 'sin ag_name')}")
-                if self.priority > self.agent.max_priority:
-                    print("Behaviour {} ha intentado ejecutarse con prioridad {} pero la prioridad máxima del agente es {}".format(self, self.priority, self.agent.max_priority))
-                """
-
-                """
-                if self.priority > self.agent.max_priority:
-                    print("Behaviour {} ha intentado ejecutarse con prioridad {} pero la prioridad máxima del agente es {}".format(self, self.priority, self.agent.max_priority))
-                await self.wait_until_high_priority()
-                """
-                """
-                loop = asyncio.get_running_loop()
-                for i, h in enumerate(loop._ready):
-                    print("loop._ready antes de hacer el _run:")
-                    print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}, ag_name={getattr(h, 'ag_name', 'sin ag_name')}")
-                """
-                #print(f"loop._current_handle:", loop._current_handle.ag_name)
                 await self._run()
-                #await self.change_multiple_priorities()
-                #await self.agent.change_priority()
-                #opcion = input("Quieres cambiar la prioridad de algun comportamiento? (s/n)")
-                #if opcion.lower() == "s":
-                    #self.change_priority()
-                    #await self.change_multiple_priorities()
+                # Cambio para llamar a los cambios de prioridad
                 await self.agent.change_priority()
-                #print("terminado el _run de {}".format(self.name))
+                await self.agent.loop.reorder_event_loop()
+
                 await asyncio.sleep(0)  # relinquish cpu
             except CancelledError:  # pragma: no cover
                 logger.debug("Behaviour {} cancelled".format(self))
@@ -351,12 +322,7 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         self.agent.remove_behaviour(self)
     
     def is_handle_of_behaviour(self, handle, behaviour):
-        #El handle utiliza el ag_name(el parametro opcional) del agente y no el jid
-        #print("entrado en handle of behaviour: handle={}, behaviour={}".format(handle.ag_name, behaviour.agent.name))
         handle_name = getattr(handle, "ag_name", None)
-        #print(f"[DEBUG] Comprobando handle: {handle_name}")
-        #print(f"[DEBUG] Comprobando callback: {handle._callback}")
-        #print(f"[DEBUG] Comprobando contexto: {handle._context}")
         behaviour_name = behaviour.name
         agent_name = behaviour.agent.name
         
@@ -381,10 +347,6 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
             PrioritizedHandle: the handle of the behaviour in the event loop
         """
         loop = asyncio.get_event_loop()
-        #for i, h in enumerate(loop._ready):
-        #            print("loop._ready antes de hacer el _run:")
-        #            print(f"  {i}: {h}, priority={getattr(h, 'priority', 'sin prioridad')}, ag_name={getattr(h, 'ag_name', 'sin ag_name')}")
-        #print(f"loop._current_handle:", loop._current_handle.ag_name)
         actual_handle = getattr(loop, "_current_handle", None)
         if actual_handle.ag_name == f"{self.agent.name}_{self.name}":
             return actual_handle
@@ -412,116 +374,6 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
                 raise ValueError("El handle no contiene una PrioritizedTask.")
         
         raise ValueError("Behaviour no encontrado en el event loop.")
-
-    async def change_multiple_priorities(self):
-        ag_behaviours = self.agent.get_behaviours()
-        behaviours_priorities = {behaviour.name: behaviour.priority for behaviour in ag_behaviours}
-        self.agent.max_priority = min(behaviours_priorities.values())
-        print("Comportamientos y prioridades actuales:", behaviours_priorities)
-        for behaviour in ag_behaviours:
-            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
-            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
-            if opcion == 's':
-                try:
-                    nueva = int(input("Introduce la nueva prioridad: "))
-                    behaviour.priority = nueva
-                    behaviours_priorities[behaviour.name] = nueva
-                    print("Prioridad de {} cambiada a {}".format(behaviour.name, behaviour.priority))
-                except ValueError:
-                    print("Valor inválido. Prioridad no cambiada.")
-        
-        self.agent.max_priority = min(b.priority for b in self.agent.get_behaviours())
-        """
-        if isinstance(behaviour, PeriodicBehaviour):
-            nuevo = behaviour.__class__(period=behaviour.period.total_seconds(), priority=behaviour.priority)
-            ag.add_behaviour(nuevo)
-
-        elif isinstance(behaviour, TimeoutBehaviour):
-            nuevo = behaviour.__class__(start_at=behaviour._timeout, priority=behaviour.priority)
-            ag.add_behaviour(nuevo)
-
-        elif isinstance(behaviour, FSMBehaviour):
-            nuevo = behaviour.__class__(priority=behaviour.priority)
-            ag.add_behaviour(nuevo)
-        
-        elif isinstance(behaviour, OneShotBehaviour):
-            if not behaviour._already_executed:
-                nuevo = behaviour.__class__(priority=behaviour.priority)
-                ag.add_behaviour(nuevo)
-        
-        elif isinstance(behaviour, CyclicBehaviour):
-            nuevo = behaviour.__class__(priority=behaviour.priority)
-            ag.add_behaviour(nuevo)
-        """
-    def change_priorities(self):
-        """
-        Allows the user to change the priority of the behaviour.
-        This method is intended to be called from the agent's console.
-        """
-        
-        loop = asyncio.get_event_loop()
-        behaviours = self.agent.get_behaviours()
-        for behaviour in behaviours:
-            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
-            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
-            if opcion == 's':
-                try:
-                    nueva = int(input("Introduce la nueva prioridad: "))
-                    behaviour.priority = nueva
-                    behaviour.kill()  # Stop the behaviour to apply the new priority
-                    self.agent.add_behaviour(behaviour)  # Re-add the behaviour with the new priority
-                    #self.agent.remove_behaviour(behaviour)
-                    #self.agent.add_behaviour(behaviour)  # Re-add the behaviour with the new priority
-                    #loop.update_handle_priority(loop, handle, nueva)
-                    #self.agent.set_loop(loop)
-                    
-                    print("Prioridad de {} cambiada a {}".format(behaviour.name, behaviour.priority))
-            
-                except ValueError:
-
-                    print("No puedes cambiar la prioridad de este comportamiento porque se esta ejecutando o porque no has introducido un entero para cambiar prioridad.")
-
-    def change_priority(self):
-        behaviours = self.agent.get_behaviours()
-        ag = self.agent
-        for behaviour in behaviours:
-            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
-            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
-            if opcion == 's':
-                try:
-                    antigua = behaviour.priority
-                    nueva = int(input("Introduce la nueva prioridad: "))
-                    behaviour.priority = nueva
-                    print("Prioridad cambiada a {}".format(behaviour.priority))
-                    behaviour.kill()  # Stop the behaviour to apply the new priority
-                    
-                    if isinstance(behaviour, PeriodicBehaviour):
-                        nuevo = behaviour.__class__(period=behaviour.period.total_seconds(), priority=behaviour.priority)
-                        ag.add_behaviour(nuevo)
-
-                    elif isinstance(behaviour, TimeoutBehaviour):
-                        nuevo = behaviour.__class__(start_at=behaviour._timeout, priority=behaviour.priority)
-                        ag.add_behaviour(nuevo)
-
-                    elif isinstance(behaviour, FSMBehaviour):
-                        nuevo = behaviour.__class__(priority=behaviour.priority)
-                        ag.add_behaviour(nuevo)
-                    
-                    elif isinstance(behaviour, OneShotBehaviour):
-                        if not behaviour._already_executed:
-                            nuevo = behaviour.__class__(priority=behaviour.priority)
-                            ag.add_behaviour(nuevo)
-
-                    elif isinstance(behaviour, CyclicBehaviour):
-                        nuevo = behaviour.__class__(priority=behaviour.priority)
-                        ag.add_behaviour(nuevo)
-                except ValueError:
-                    behaviour.priority = antigua
-                    print("No puedes cambiar la prioridad de este comportamiento porque se esta ejecutando o porque no se ha introducido un entero para cambiar prioridad.")
-            elif opcion == 'n':
-                print("Prioridad no cambiada")
-            else:
-                print("Entrada no válida. Prioridad no cambiada.")
     
     async def enqueue(self, message: Message) -> None:
         """
@@ -542,6 +394,16 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         """
         return self.queue.qsize()
 
+    def msg_not_replied(self) -> int:
+        """
+        Checks messages not replied.
+
+        Returns:
+          int: the number of messages not replied
+
+        """
+        return self.queue._unfinished_tasks
+
     async def send(self, msg: Message) -> None:
         """
         Sends a message.
@@ -553,6 +415,7 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
             msg.sender = str(self.agent.jid)
             logger.debug(f"Adding agent's jid as sender to message: {msg}")
         await self.agent.container.send(msg, self)
+        
         msg.sent = True
         self.agent.traces.append(msg, category=str(self))
 

@@ -112,6 +112,7 @@ class Container(object):
         to = str(msg.to)
         if to in self.__agents:
             self.__agents[to].dispatch(msg)
+            #self.__agents[to].enqueue(msg)
         else:
             await behaviour._xmpp_send(msg=msg)
 

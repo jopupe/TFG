@@ -55,7 +55,8 @@ class Agent(object):
 
         self.container = Container()
         self.container.register(self)
-        self.max_priority = 9999
+        # Cambio de la versión de semáforo por prioridad
+        #self.max_priority = 9999
         self.loop = self.container.loop
         asyncio.set_event_loop(self.loop)
 
@@ -191,40 +192,8 @@ class Agent(object):
         Change the priority of the agent.
         This method may be overloaded by the user to change the priority of a behaviour.
         """
-        
-        ag_behaviours = self.get_behaviours()
-        behaviours_priorities = {behaviour.name: behaviour.priority for behaviour in ag_behaviours}
-        
-        print("Comportamientos y prioridades actuales:", behaviours_priorities)
-        for behaviour in ag_behaviours:
-            print("Prioridad actual de {}: {}".format(behaviour.name, behaviour.priority))
-            opcion = input("¿Quieres cambiar la prioridad de {}? (s/n): ".format(behaviour.name)).lower()
-            if opcion == 's':
-                try:
-                    nueva = int(input("Introduce la nueva prioridad: "))
-                    
-                    #behaviours_priorities[behaviour.name] = nueva
-                    loop = asyncio.get_event_loop()
-                    handle_of_behaviour = behaviour.get_handle()
-                    if behaviour.is_handle_of_behaviour(handle_of_behaviour, behaviour):
-                        #loop.change_priority(handle_of_behaviour, nueva)
-                        
-                        task = behaviour.get_task()
-                        task.change_task_priority(nueva, handle_of_behaviour)
-                        #previous_priority = behaviour.priority
-                        behaviour.priority = nueva
-                        #behaviour.change_task_priority(nueva)
-                        #behaviour.reinsert_in_current_iteration(behaviour)
-                        #print("Esperando a que la prioridad de {} sea mayor que {}".format(behaviour.name, max_priority))
-                    #ag.priority = nueva
-                    #behaviour.kill()
-                    #ag.remove_behaviour(behaviour)
-                    print("Prioridad de {} cambiada a {}".format(behaviour.name, behaviour.priority))
-                    
-                except ValueError:
-                    print("No puedes cambiar la prioridad de este comportamiento porque se esta ejecutando o porque no has introducido un entero para cambiar prioridad.")
-        
-        #self.agent.max_priority = min(b.priority for b in self.agent.get_behaviours())
+        pass
+
     def change_behaviour_priority_forever(self, behaviour: BehaviourType, new_priority: int) -> None:
         """
         Change the priority of a behaviour permanently.
@@ -313,7 +282,7 @@ class Agent(object):
         #Cambiado
         # Crear la tarea utilizando el contexto
         return self.loop.create_task(coro, priority=priority, ag_name= f"{self.jid.localpart}_{name}")
-        #return self.loop.create_task(coro, priority=priority, ag_name=f"{self.ag_name}_{name}")
+        #return self.loop.create_task(coro, priority=priority, ag_name=f"{self.ag_name}_{name}") versión anterior
     def add_behaviour(
         self, behaviour: BehaviourType, template: Optional[Template] = None
     ) -> None:
@@ -439,33 +408,7 @@ class Agent(object):
             list: a list of all behaviours registered in the agent.
         """
         return self.behaviours
-    """
-    def get_running_behaviours(self) -> List[BehaviourType]:
-        """
-        #Returns a list of all behaviours registered in the agent that are running.
-
-        #Returns:
-        #    list: a list of all behaviours registered in the agent that are running.
-    """
-        running_behaviours = []
-        for behaviour in self.behaviours:
-            if behaviour.is_running:
-                running_behaviours.append(behaviour)
-        return running_behaviours
-        
-    def get_executable_behaviours(self) -> List[BehaviourType]:
-        """
-        #Returns a list of all behaviours registered in the agent that are executable in that moment.
-
-        #Returns:
-        #    list: a list of all behaviours registered in the agent that are executable in that moment.
-    """
-        executable_behaviours = []
-        for behaviour in self.behaviours:
-            if isinstance(behaviour, OneShotBehaviour) and not behaviour._already_executed:
-                executable_behaviours.append(behaviour)
-        return executable_behaviours
-    """
+    
     def _message_received(self, msg: aioxmpp.Message) -> List[Task]:
         """
         Callback run when an XMPP Message is reveived.
@@ -538,7 +481,7 @@ class Agent(object):
         """
         all_vars = {}
         for agent in self.container.get_agents():
-            all_vars[agent.name] = agent.get_all_behaviour_vars()
+            all_vars[agent.name] = agent.get_all_behaviours_vars()
         return all_vars
 
     def get_one_var_from_all_behaviours(self, var):
@@ -581,7 +524,7 @@ class Agent(object):
 
     def priority_changed_once(self, bh):
         """
-        Returns True if the priority of the behaviour has changed since it was created.
+        Returns True if the priority of the behaviour has changed for one execution.
 
         Returns:
             bool: True if the priority has changed for one execution, False otherwise.
@@ -595,6 +538,8 @@ class Agent(object):
         Returns:
             int: the number of executions of the behaviour.
         """
+        if self.is_executing(bh):
+            return bh.get_task().execounter + 1
         return bh.get_task().execounter
     
     def is_executing(self, bh):
@@ -605,3 +550,16 @@ class Agent(object):
             bool: True if the behaviour is currently executing, False otherwise.
         """
         return bh.get_handle() is self.loop._current_handle
+    
+    def get_all_behaviours_priority(self):
+        """
+        Returns a dictionary with all behaviour priorities for all behaviours.
+
+        Returns:
+            dict: a dictionary with all behaviour priorities for all behaviours.
+        """
+        all_priorities = {}
+        for ag in self.container.get_agents():
+            for behaviour in self.behaviours:
+                all_priorities[behaviour.name] = self.get_beh_priority(behaviour)
+        return all_priorities
