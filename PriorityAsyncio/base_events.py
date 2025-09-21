@@ -60,7 +60,7 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
                 line_name = f"{agent_name[:-1]}_p:{priority}"
             else:
                 line_name = f"{agent_name}{task_name}_p:{priority}"  
-            if  priority !=0: # Aquí se filtra qué eventos se quieren mostrar en la traza
+            if  priority !=0 and task_name == "__step": # Aquí se filtra qué eventos se quieren mostrar en la traza
                 self._define_line_name(line_name, priority)
                 defined_events.add((line_name, event_type, current_time, color))
 
@@ -385,6 +385,11 @@ class PrioritizedEventLoop(asyncio.SelectorEventLoop):
         if isTrace:
             current_time = time.perf_counter() - self.start_time
             self._log_event('PRIORITY_CHANGE', handle, current_time)
+
+    async def reorder_event_loop(self):
+        """Reorder the ready queue based on task priority."""
+        self._ready.sort(key=lambda h: (h.priority, h.ag_name))
+        heapq.heapify(self._ready)
 
 def _run_until_complete_cb(fut):
     if not fut.cancelled():

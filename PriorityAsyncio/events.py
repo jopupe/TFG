@@ -75,6 +75,7 @@ class PrioritizedTimerHandle(asyncio.TimerHandle):
             # Si el callback es un método de una PrioritizedTask
             if hasattr(callback, "__self__") and isinstance(callback.__self__, PrioritizedTask):
                 return callback.__self__
+    
     # Método de comparación
     def __lt__(self, other):
         if self.priority == other.priority:

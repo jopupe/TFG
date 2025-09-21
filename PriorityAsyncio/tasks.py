@@ -45,6 +45,7 @@ class PrioritizedTask(futures._PyFuture):  # Inherit Python Task implementation
     def __init__(self, coro, priority, *, loop=None, name=None, ag_name = None, context=None,
                  eager_start=False):
         super().__init__(loop=loop)
+        # Añadido para el sistema de desempate
         self.execounter = 0
         if self._source_traceback:
             del self._source_traceback[-1]
